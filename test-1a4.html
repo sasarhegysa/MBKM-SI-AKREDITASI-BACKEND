@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Uji Coba CRUD 1.A.4 - Beban DTPR (Auto-Detect)</title>
+    <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: center; }
+        .summary-row { background-color: #f2f2f2; font-weight: bold; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; max-width: 800px; background: #fafafa; padding: 15px; border-radius: 8px; }
+        .header-manajemen { background-color: #fff9c4; }
+    </style>
+</head>
+<body>
+    <h1>Smart Testing (Tabel 1.A.4 - EWMP)</h1>
+
+    <div>
+        <h3>1. Akses & Navigasi</h3>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        | 
+        <strong>ID Tahun (TS):</strong> 
+        <input type="number" id="filter_id_tahun" value="1" style="width: 50px;">
+        <button onclick="fetchData()">Tampilkan/Refresh Data</button>
+    </div>
+    <hr>
+
+    <div>
+        <h3>2. Input Beban DTPR</h3>
+        <p><small>*Backend akan mendeteksi Jabatan/SKS Manajemen secara otomatis berdasarkan ID Dosen.</small></p>
+        <div class="form-grid">
+            <input type="number" id="id_dosen" placeholder="ID Dosen (Wajib)">
+            <input type="number" id="id_tahun" placeholder="ID Tahun (TS)" value="1">
+            <span></span> <input type="number" id="sks_ps_sendiri" placeholder="SKS PS Sendiri" step="0.01">
+            <input type="number" id="sks_ps_lain" placeholder="SKS PS Lain" step="0.01">
+            <input type="number" id="sks_pt_lain" placeholder="SKS PT Lain" step="0.01">
+            
+            <input type="number" id="sks_penelitian" placeholder="SKS Penelitian" step="0.01">
+            <input type="number" id="sks_pkm" placeholder="SKS PkM" step="0.01">
+            <input type="number" id="sks_manajemen_pt_lain" placeholder="SKS Manajemen PT Lain" step="0.01">
+        </div>
+        <br>
+        <button onclick="saveData()" style="background: #4caf50; color: white; border: none; padding: 10px 15px; cursor: pointer;">Simpan Data</button>
+        <button onclick="exportExcel()">Export Excel</button>
+    </div>
+    <hr>
+
+    <div>
+        <h3>3. Hasil EWMP (Snapshot)</h3>
+        <table id="table-ewmp">
+            <thead>
+                <tr>
+                    <th rowspan="2">Nama DTPR</th>
+                    <th colspan="3">SKS Pengajaran</th>
+                    <th rowspan="2">Penelitian</th>
+                    <th rowspan="2">PkM</th>
+                    <th colspan="2" class="header-manajemen">SKS Manajemen</th>
+                    <th rowspan="2">Total SKS</th>
+                    <th rowspan="2">Aksi</th>
+                </tr>
+                <tr>
+                    <th>PS Sendiri</th>
+                    <th>PS Lain</th>
+                    <th>PT Lain</th>
+                    <th class="header-manajemen">PT Sendiri (Auto)</th>
+                    <th>PT Lain</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+        </table>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5000/api';
+        let token = localStorage.getItem('token') || '';
+
+        async function login() {
+            const res = await fetch(`${BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            const result = await res.json();
+            if(result.success) {
+                token = result.token;
+                localStorage.setItem('token', token);
+                alert('Login Berhasil!');
+            }
+        }
+
+        async function fetchData() {
+            const idTahun = document.getElementById('filter_id_tahun').value;
+            const res = await fetch(`${BASE_URL}/upps/1a4-beban?id_tahun=${idTahun}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                const tbody = document.querySelector('#table-ewmp tbody');
+                const tfoot = document.querySelector('#table-ewmp tfoot');
+                
+                tbody.innerHTML = result.data.map(item => `
+                    <tr>
+                        <td>${item.nama_dtpr}</td>
+                        <td>${item.sks_ps_sendiri}</td>
+                        <td>${item.sks_ps_lain}</td>
+                        <td>${item.sks_pt_lain}</td>
+                        <td>${item.sks_penelitian}</td>
+                        <td>${item.sks_pkm}</td>
+                        <td style="background:#fff9c4; font-weight:bold">${item.sks_manajemen_pt_sendiri}</td>
+                        <td>${item.sks_manajemen_pt_lain}</td>
+                        <td style="font-weight:bold">${item.total_sks}</td>
+                        <td><button onclick="deleteData(${item.id_beban_kerja})">Hapus</button></td>
+                    </tr>
+                `).join('');
+
+                const s = result.summary;
+                tfoot.innerHTML = `
+                    <tr class="summary-row">
+                        <td colspan="1">JUMLAH</td>
+                        <td>${parseFloat(s.sum_ps_sendiri || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_ps_lain || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_pt_lain || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_penelitian || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_pkm || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_manajemen_sendiri || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_manajemen_lain || 0).toFixed(2)}</td>
+                        <td>${parseFloat(s.sum_total || 0).toFixed(2)}</td>
+                        <td>-</td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function saveData() {
+            // Frontend SEKARANG tidak mengirim id_pimpinan.
+            // Biarkan Backend (Model) yang mencari id_pimpinan tersebut.
+            const data = {
+                id_dosen: document.getElementById('id_dosen').value,
+                id_tahun: document.getElementById('id_tahun').value,
+                sks_ps_sendiri: document.getElementById('sks_ps_sendiri').value || 0,
+                sks_ps_lain: document.getElementById('sks_ps_lain').value || 0,
+                sks_pt_lain: document.getElementById('sks_pt_lain').value || 0,
+                sks_penelitian: document.getElementById('sks_penelitian').value || 0,
+                sks_pkm: document.getElementById('sks_pkm').value || 0,
+                sks_manajemen_pt_lain: document.getElementById('sks_manajemen_pt_lain').value || 0
+            };
+
+            const res = await fetch(`${BASE_URL}/upps/1a4-beban`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await res.json();
+            if(result.success) {
+                alert('Beban kerja berhasil dicatat!');
+                fetchData();
+            }
+        }
+
+        async function deleteData(id) {
+            if(confirm('Hapus data secara permanen?')) {
+                await fetch(`${BASE_URL}/upps/1a4-beban/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                fetchData();
+            }
+        }
+
+        function exportExcel() {
+            const idTahun = document.getElementById('filter_id_tahun').value;
+            window.open(`${BASE_URL}/upps/1a4-beban/export?id_tahun=${idTahun}&token=${token}`);
+        }
+    </script>
+</body>
+</html>
