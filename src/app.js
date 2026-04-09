@@ -6,6 +6,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const route1a1 = require('./routes/upps/1a1_pimpinan_dan_tupoksi');
 const route1a4 = require('./routes/upps/1a4_beban_dtpr');
+const route3a3 = require('./routes/upps/3a3_pengembangan_dtpr');
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/upps/1a1-pimpinan', route1a1); 
 app.use('/api/upps/1a4-beban', route1a4);
+app.use('/api/upps/3a3-pengembangan', route3a3)
 
 // 4. Root Endpoint (Checking Status)
 app.get('/', (req, res) => {
