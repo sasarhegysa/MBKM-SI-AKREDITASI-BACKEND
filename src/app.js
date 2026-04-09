@@ -18,6 +18,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upps/1a1-pimpinan', route1a1); 
 app.use('/api/upps/1a4-beban', route1a4);
 
+// Master Routes
+const pegawaiRoutes = require('./routes/master/pegawaiRoutes');
+app.use('/api/master/pegawai', pegawaiRoutes);
+
 // 4. Root Endpoint (Checking Status)
 app.get('/', (req, res) => {
     res.json({
