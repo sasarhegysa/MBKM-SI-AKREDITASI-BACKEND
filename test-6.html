@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Uji Coba Polos: Tabel 6 Visi Misi</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.5; }
+        .section { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; background: #fdfdfd; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 30px; }
+        th, td { border: 1px solid black; padding: 10px; text-align: left; }
+        th { background: #BFBFBF; font-weight: bold; }
+        .row-kuning { background: #FFFF00; }
+        textarea { width: 100%; height: 80px; margin-bottom: 10px; font-family: inherit; }
+        .label-form { font-weight: bold; display: block; margin-top: 10px; }
+        .btn-action { margin-right: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>Smart Test: Tabel 6 (Kesesuaian Visi, Misi)</h1>
+
+    <!-- 1. AUTH & PRODI -->
+    <div class="section">
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        | 
+        <strong>ID Prodi:</strong> <input type="number" id="id_prodi" value="1" style="width: 50px;">
+        <button onclick="muatData()">Refresh Data</button>
+        <button onclick="exportExcel()" style="background: gold; font-weight: bold;">Export Excel</button>
+    </div>
+
+    <!-- 2. FORM INPUT -->
+    <div class="section">
+        <h3 id="form-title">Input / Edit Visi Misi</h3>
+        <input type="hidden" id="id_vm">
+        
+        <label class="label-form">Visi PT:</label>
+        <textarea id="visi_pt" placeholder="Masukkan Visi Perguruan Tinggi..."></textarea>
+        
+        <label class="label-form">Misi PT:</label>
+        <textarea id="misi_pt" placeholder="Masukkan Misi Perguruan Tinggi..."></textarea>
+        
+        <label class="label-form">Visi UPPS:</label>
+        <textarea id="visi_upps" placeholder="Masukkan Visi Unit Pengelola Program Studi..."></textarea>
+
+        <label class="label-form">Misi UPPS:</label>
+        <textarea id="misi_upps" placeholder="Masukkan Misi Unit Pengelola Program Studi..."></textarea>
+        
+        <label class="label-form">Visi Keilmuan PS:</label>
+        <textarea id="visi_keilmuan_ps" placeholder="Masukkan Visi Keilmuan Program Studi..."></textarea>
+        
+        <button onclick="simpanData()" id="btn-save" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px;">Simpan Data</button>
+        <button onclick="resetForm()">Reset / Batal</button>
+    </div>
+
+    <!-- 3. PREVIEW AREA -->
+    <h3>Preview Tampilan LKPS</h3>
+    <div id="data-preview"></div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5000/api/upps/6-visi-misi';
+        let token = localStorage.getItem('token') || '';
+
+        async function login() {
+            const res = await fetch('http://localhost:5000/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            const d = await res.json();
+            if(d.success) {
+                token = d.token;
+                localStorage.setItem('token', token);
+                alert("Login OK!");
+                muatData();
+            }
+        }
+
+        async function muatData() {
+            const idProdi = document.getElementById('id_prodi').value;
+            const res = await fetch(`${BASE_URL}?id_prodi=${idProdi}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+            
+            const area = document.getElementById('data-preview');
+            area.innerHTML = '';
+
+            result.data.forEach(item => {
+                area.innerHTML += `
+                    <table>
+                        <tr>
+                            <th>Visi PT</th>
+                            <th>Visi UPPS</th>
+                            <th>Visi Keilmuan PS</th>
+                        </tr>
+                        <tr class="row-kuning">
+                            <td>${item.visi_pt}</td>
+                            <td>${item.visi_upps}</td>
+                            <td>${item.visi_keilmuan_ps}</td>
+                        </tr>
+                        <tr>
+                            <th>Misi PT</th>
+                            <th>Misi UPPS</th>
+                            <th>Aksi Data</th>
+                        </tr>
+                        <tr class="row-kuning">
+                            <td>${item.misi_pt}</td>
+                            <td>${item.misi_upps}</td>
+                            <td>
+                                <button class="btn-action" onclick='isiEdit(${JSON.stringify(item)})'>Edit</button>
+                                <button class="btn-action" onclick="hapusSoft(${item.id_vm})" style="color:red">Hapus</button>
+                            </td>
+                        </tr>
+                    </table>
+                `;
+            });
+        }
+
+        async function simpanData() {
+            const id = document.getElementById('id_vm').value;
+            const data = {
+                id_prodi: document.getElementById('id_prodi').value,
+                visi_pt: document.getElementById('visi_pt').value,
+                misi_pt: document.getElementById('misi_pt').value,
+                visi_upps: document.getElementById('visi_upps').value,
+                misi_upps: document.getElementById('misi_upps').value,
+                visi_keilmuan_ps: document.getElementById('visi_keilmuan_ps').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${BASE_URL}/${id}` : BASE_URL;
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(data)
+            });
+            const r = await res.json();
+            alert(r.message);
+            resetForm();
+            muatData();
+        }
+
+        async function hapusSoft(id) {
+            if(confirm("Yakin hapus?")) {
+                await fetch(`${BASE_URL}/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                muatData();
+            }
+        }
+
+        function isiEdit(item) {
+            document.getElementById('id_vm').value = item.id_vm;
+            document.getElementById('visi_pt').value = item.visi_pt;
+            document.getElementById('misi_pt').value = item.misi_pt;
+            document.getElementById('visi_upps').value = item.visi_upps;
+            document.getElementById('misi_upps').value = item.misi_upps;
+            document.getElementById('visi_keilmuan_ps').value = item.visi_keilmuan_ps;
+            document.getElementById('btn-save').innerText = "Update Data";
+            document.getElementById('form-title').innerText = "Edit Visi Misi";
+        }
+
+        function resetForm() {
+            document.getElementById('id_vm').value = '';
+            document.querySelectorAll('textarea').forEach(t => t.value = '');
+            document.getElementById('btn-save').innerText = "Simpan Data";
+            document.getElementById('form-title').innerText = "Input / Edit Visi Misi";
+        }
+
+        function exportExcel() {
+            const idProdi = document.getElementById('id_prodi').value;
+            window.open(`${BASE_URL}/export?id_prodi=${idProdi}&token=${token}`);
+        }
+    </script>
+</body>
+</html>
