@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Uji Coba 1.B - SPMI (TPM Only)</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .section { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; background: #f9f9f9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid black; padding: 10px; text-align: center; }
+        th { background: #eee; }
+        .row-kuning { background: #ffff00; }
+        input { margin-bottom: 5px; width: 250px; }
+    </style>
+</head>
+<body>
+
+    <h1>Uji Coba Tabel 1.B (Unit SPMI & SDM)</h1>
+
+    <div class="section">
+        <h3>1. Login & Filter</h3>
+        <input type="text" id="username" placeholder="Username (Role: TPM)">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        | <strong>Tahun:</strong> <input type="number" id="filter_tahun" value="1" style="width: 50px;">
+        <button onclick="fetchData()">Muat Data</button>
+        <button onclick="exportExcel()" style="background: gold; font-weight: bold;">Export Excel</button>
+    </div>
+
+    <div class="section">
+        <h3>2. Input Data SPMI</h3>
+        <input type="hidden" id="id_unit_spmi">
+        <label>Unit Kerja ID:</label><br><input type="number" id="unit_kerja_id_unit" placeholder="ID Unit Kerja"><br>
+        <label>Dokumen SPMI (Link):</label><br><input type="text" id="dokumen_spmi"><br>
+        <label>Auditor Certified:</label><br><input type="number" id="auditor_certified" value="0"><br>
+        <label>Auditor Non-Certified:</label><br><input type="number" id="auditor_non_certified" value="0"><br>
+        <label>Frekuensi Audit:</label><br><input type="number" id="frekuensi_audit" value="1"><br>
+        <label>Link Bukti Sertifikat:</label><br><input type="text" id="bukti_certified_auditor"><br>
+        <label>Link Laporan Audit:</label><br><input type="text" id="laporan_audit"><br>
+        
+        <button onclick="saveData()" id="btn-save" style="background: green; color: white;">Simpan Data SPMI</button>
+        <button onclick="resetForm()">Reset</button>
+    </div>
+
+    <h3>3. Dashboard Penjaminan Mutu</h3>
+    <table id="table-spmi">
+        <thead>
+            <tr>
+                <th>Unit Kerja</th>
+                <th>Total Auditor</th>
+                <th>Cert.</th>
+                <th>Non-Cert.</th>
+                <th>Frekuensi</th>
+                <th>Dokumen</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        const API = 'http://localhost:5000/api/tpm/1b-spmi';
+        let token = localStorage.getItem('token') || '';
+
+        async function login() {
+            const res = await fetch('http://localhost:5000/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: document.getElementById('username').value, password: document.getElementById('password').value })
+            });
+            const d = await res.json();
+            if(d.success) { 
+                token = d.token; 
+                localStorage.setItem('token', token);
+                alert("Login TPM Berhasil"); 
+                fetchData(); 
+            }
+        }
+
+        async function fetchData() {
+            const th = document.getElementById('filter_tahun').value;
+            const res = await fetch(`${API}?id_tahun=${th}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const result = await res.json();
+            
+            const tbody = document.querySelector('#table-spmi tbody');
+            tbody.innerHTML = result.data.map(d => `
+                <tr class="row-kuning">
+                    <td>${d.nama_unit}</td>
+                    <td><b>${d.jumlah_auditor}</b></td>
+                    <td>${d.auditor_certified}</td>
+                    <td>${d.auditor_non_certified}</td>
+                    <td>${d.frekuensi_audit}x</td>
+                    <td><a href="${d.dokumen_spmi}" target="_blank">Buka</a></td>
+                    <td>
+                        <button onclick='isiEdit(${JSON.stringify(d)})'>Edit</button>
+                        <button onclick="hapus(${d.id_unit_spmi})">Hapus</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function saveData() {
+            const id = document.getElementById('id_unit_spmi').value;
+            const body = {
+                unit_kerja_id_unit: document.getElementById('unit_kerja_id_unit').value,
+                tahun_akademik_id_tahun: document.getElementById('filter_tahun').value,
+                dokumen_spmi: document.getElementById('dokumen_spmi').value,
+                auditor_certified: document.getElementById('auditor_certified').value,
+                auditor_non_certified: document.getElementById('auditor_non_certified').value,
+                frekuensi_audit: document.getElementById('frekuensi_audit').value,
+                bukti_certified_auditor: document.getElementById('bukti_certified_auditor').value,
+                laporan_audit: document.getElementById('laporan_audit').value
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${API}/${id}` : API;
+
+            await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body)
+            });
+            resetForm(); fetchData();
+        }
+
+        function isiEdit(d) {
+            document.getElementById('id_unit_spmi').value = d.id_unit_spmi;
+            document.getElementById('unit_kerja_id_unit').value = d.unit_kerja_id_unit;
+            document.getElementById('dokumen_spmi').value = d.dokumen_spmi;
+            document.getElementById('auditor_certified').value = d.auditor_certified;
+            document.getElementById('auditor_non_certified').value = d.auditor_non_certified;
+            document.getElementById('frekuensi_audit').value = d.frekuensi_audit;
+            document.getElementById('bukti_certified_auditor').value = d.bukti_certified_auditor;
+            document.getElementById('laporan_audit').value = d.laporan_audit;
+            document.getElementById('btn-save').innerText = "Update Data";
+        }
+
+        function resetForm() {
+            document.getElementById('id_unit_spmi').value = '';
+            document.getElementById('btn-save').innerText = "Simpan Data SPMI";
+        }
+
+        async function hapus(id) {
+            if(confirm("Hapus ke sampah?")) {
+                await fetch(`${API}/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                fetchData();
+            }
+        }
+
+        function exportExcel() {
+            const th = document.getElementById('filter_tahun').value;
+            window.open(`${API}/export?id_tahun=${th}&token=${token}`);
+        }
+    </script>
+</body>
+</html>
