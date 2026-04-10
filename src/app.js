@@ -6,6 +6,8 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const route1a1 = require('./routes/upps/1a1_pimpinan_dan_tupoksi');
 const route1a4 = require('./routes/upps/1a4_beban_dtpr');
+const route3a3 = require('./routes/upps/3a3_pengembangan_dtpr');
+const route6 = require('./routes/upps/6_visi_misi.js');
 
 const app = express();
 
@@ -17,6 +19,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/upps/1a1-pimpinan', route1a1); 
 app.use('/api/upps/1a4-beban', route1a4);
+app.use('/api/upps/3a3-pengembangan', route3a3)
+app.use('/api/upps/6-visi-misi', route6);
 
 // Master Routes
 const pegawaiRoutes = require('./routes/master/pegawaiRoutes');
@@ -45,5 +49,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server berjalan di port ${PORT}`);
     console.log(`✅ Auth: http://localhost:${PORT}/api/auth/login`);
-    console.log(`✅ UPPS 1.A.1: http://localhost:${PORT}/api/upps/1a1-pimpinan`);
 });

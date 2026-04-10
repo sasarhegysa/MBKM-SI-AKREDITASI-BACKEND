@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Uji Coba Polos CRUD 3.A.3</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .row-kuning { background: #ffff00; }
+        .section { margin-bottom: 30px; border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+        .stats-box { display: flex; gap: 20px; margin-bottom: 15px; }
+        .stat-item { border: 1px solid #333; padding: 10px; flex: 1; text-align: center; }
+        .form-group { margin-bottom: 10px; }
+        label { display: inline-block; width: 150px; }
+    </style>
+</head>
+<body>
+
+    <h1>Test CRUD Tabel 3.A.3 (Pengembangan DTPR)</h1>
+
+    <!-- 1. AUTH & TAHUN -->
+    <div class="section">
+        <h3>1. Login & Filter Tahun</h3>
+        <div class="form-group">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>ID Tahun (TS):</label>
+            <input type="number" id="filter_id_tahun" value="3">
+            <button onclick="muatSemuaData()">Muat Data & Statistik</button>
+            <button onclick="exportExcel()" style="background: gold;">Export ke Excel</button>
+        </div>
+    </div>
+
+    <!-- 2. STATISTIK HEADER -->
+    <div class="stats-box">
+        <div class="stat-item"><strong>TS-2:</strong> <span id="stat-ts2">0</span></div>
+        <div class="stat-item"><strong>TS-1:</strong> <span id="stat-ts1">0</span></div>
+        <div class="stat-item"><strong>TS:</strong> <span id="stat-ts">0</span></div>
+    </div>
+
+    <!-- 3. FORM INPUT -->
+    <div class="section">
+        <h3 id="form-title">2. Form Input / Edit</h3>
+        <input type="hidden" id="id_pengembangan">
+        <div class="form-group"><label>ID Dosen:</label><input type="number" id="id_dosen"></div>
+        <div class="form-group"><label>ID Tahun:</label><input type="number" id="id_tahun" value="3"></div>
+        <div class="form-group"><label>Jenis:</label><input type="text" id="jenis_pengembangan"></div>
+        <div class="form-group"><label>Nama Kegiatan:</label><input type="text" id="nama_pengembangan"></div>
+        <div class="form-group"><label>Link Bukti:</label><input type="text" id="link_bukti"></div>
+        <button onclick="simpanData()" id="btn-submit">Simpan Data</button>
+        <button onclick="resetForm()">Batal / Reset</button>
+    </div>
+
+    <!-- 4. DATA AKTIF -->
+    <h3>3. Daftar Data Aktif</h3>
+    <table id="table-aktif">
+        <thead>
+            <tr>
+                <th>Nama DTPR</th>
+                <th>Jenis</th>
+                <th>Kegiatan</th>
+                <th>Bukti</th>
+                <th>Aksi</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <!-- 5. TEMPAT SAMPAH -->
+    <div class="section" style="border-color: red;">
+        <h3 style="color: red;">4. Tempat Sampah (Soft Deleted)</h3>
+        <table id="table-sampah">
+            <thead>
+                <tr>
+                    <th>Nama DTPR</th>
+                    <th>Kegiatan</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const URL_API = 'http://localhost:5000/api/upps/3a3-pengembangan';
+        const URL_AUTH = 'http://localhost:5000/api/auth/login';
+        let token = localStorage.getItem('token') || '';
+
+        async function login() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch(URL_AUTH, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            const d = await res.json();
+            if(d.success) {
+                token = d.token;
+                localStorage.setItem('token', token);
+                alert("Login Berhasil!");
+                muatSemuaData();
+            } else {
+                alert("Login Gagal: " + d.message);
+            }
+        }
+
+        function muatSemuaData() {
+            ambilDataAktif();
+            ambilDataSampah();
+        }
+
+        async function ambilDataAktif() {
+            const ts = document.getElementById('filter_id_tahun').value;
+            const res = await fetch(`${URL_API}?id_tahun=${ts}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+            if(result.success) {
+                // Update Stats
+                const stats = result.stats;
+                const map = {};
+                stats.forEach(s => map[s.id_tahun] = s.jumlah_dosen);
+                document.getElementById('stat-ts').innerText = map[ts] || 0;
+                document.getElementById('stat-ts1').innerText = map[ts-1] || 0;
+                document.getElementById('stat-ts2').innerText = map[ts-2] || 0;
+
+                // Update Table
+                const body = document.querySelector('#table-aktif tbody');
+                body.innerHTML = result.data.map(d => `
+                    <tr class="row-kuning">
+                        <td>${d.nama_dtpr}</td>
+                        <td>${d.jenis_pengembangan}</td>
+                        <td>${d.nama_pengembangan}</td>
+                        <td><a href="${d.link_bukti}" target="_blank">Link</a></td>
+                        <td>
+                            <button onclick='isiForm(${JSON.stringify(d)})'>Edit</button>
+                            <button onclick="hapusSoft(${d.id_pengembangan})">Hapus</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        async function ambilDataSampah() {
+            const ts = document.getElementById('filter_id_tahun').value;
+            const res = await fetch(`${URL_API}/trash?id_tahun=${ts}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await res.json();
+            if(result.success) {
+                const body = document.querySelector('#table-sampah tbody');
+                body.innerHTML = result.data.map(d => `
+                    <tr>
+                        <td>${d.nama_dtpr}</td>
+                        <td>${d.nama_pengembangan}</td>
+                        <td>
+                            <button onclick="pulihkan(${d.id_pengembangan})">Pulihkan</button>
+                            <button onclick="hapusKeras(${d.id_pengembangan})">Hapus Permanen</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        async function simpanData() {
+            const id = document.getElementById('id_pengembangan').value;
+            const body = {
+                id_dosen: document.getElementById('id_dosen').value,
+                id_tahun: document.getElementById('id_tahun').value,
+                jenis_pengembangan: document.getElementById('jenis_pengembangan').value,
+                nama_pengembangan: document.getElementById('nama_pengembangan').value,
+                link_bukti: document.getElementById('link_bukti').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${URL_API}/${id}` : URL_API;
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body)
+            });
+            const r = await res.json();
+            alert(r.message);
+            resetForm();
+            muatSemuaData();
+        }
+
+        async function hapusSoft(id) {
+            if(confirm("Pindahkan ke sampah?")) {
+                await fetch(`${URL_API}/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                muatSemuaData();
+            }
+        }
+
+        async function pulihkan(id) {
+            await fetch(`${URL_API}/restore/${id}`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+            muatSemuaData();
+        }
+
+        async function hapusKeras(id) {
+            if(confirm("HAPUS PERMANEN? Data tidak bisa kembali.")) {
+                await fetch(`${URL_API}/hard/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                muatSemuaData();
+            }
+        }
+
+        function isiForm(d) {
+            document.getElementById('id_pengembangan').value = d.id_pengembangan;
+            document.getElementById('id_dosen').value = d.id_dosen;
+            document.getElementById('id_tahun').value = d.id_tahun;
+            document.getElementById('jenis_pengembangan').value = d.jenis_pengembangan;
+            document.getElementById('nama_pengembangan').value = d.nama_pengembangan;
+            document.getElementById('link_bukti').value = d.link_bukti;
+            document.getElementById('btn-submit').innerText = "Update Data";
+            document.getElementById('form-title').innerText = "2. Mode Edit Data";
+        }
+
+        function resetForm() {
+            document.getElementById('id_pengembangan').value = "";
+            document.getElementById('id_dosen').value = "";
+            document.getElementById('jenis_pengembangan').value = "";
+            document.getElementById('nama_pengembangan').value = "";
+            document.getElementById('link_bukti').value = "";
+            document.getElementById('btn-submit').innerText = "Simpan Data";
+            document.getElementById('form-title').innerText = "2. Form Input / Edit";
+        }
+
+        function exportExcel() {
+            const ts = document.getElementById('filter_id_tahun').value;
+            window.open(`${URL_API}/export?id_tahun=${ts}&token=${token}`);
+        }
+    </script>
+</body>
+</html>
